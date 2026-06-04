@@ -3,18 +3,17 @@
 # FIP — one-shot Cloudflare deploy (Worker + D1 + R2). Idempotent: safe to re-run.
 #
 # Usage (from anywhere; the script finds the repo root):
-#   export CLOUDFLARE_API_TOKEN=xxxxxxxx
-#   export CLOUDFLARE_ACCOUNT_ID=xxxxxxxx
 #   bash scripts/deploy.sh
 #
-# The API token needs these account permissions:
-#   Workers Scripts:Edit · D1:Edit · Workers R2 Storage:Edit · Account Settings:Read
-# (the "Edit Cloudflare Workers" template + D1:Edit covers it).
+# Auth (either works):
+#   - an interactive `wrangler login` session, OR
+#   - export CLOUDFLARE_API_TOKEN (+ CLOUDFLARE_ACCOUNT_ID if your token spans
+#     multiple accounts). Token scopes:
+#       Workers Scripts:Edit · D1:Edit · Workers R2 Storage:Edit · Account Settings:Read
 #
 set -euo pipefail
 
-: "${CLOUDFLARE_API_TOKEN:?Set CLOUDFLARE_API_TOKEN (Cloudflare API token)}"
-: "${CLOUDFLARE_ACCOUNT_ID:?Set CLOUDFLARE_ACCOUNT_ID (Cloudflare account id)}"
+# Non-interactive (auto-confirm wrangler d1 --remote prompts) + quiet metrics.
 export WRANGLER_SEND_METRICS=false CI=1
 
 DB_NAME=fip-db
@@ -32,7 +31,12 @@ step "Installing dependencies (incl. devDependencies)"
 npm ci --include=dev
 
 step "Verifying Cloudflare auth"
-npx wrangler whoami
+WHOAMI="$(npx wrangler whoami 2>&1 || true)"
+echo "$WHOAMI"
+if printf '%s' "$WHOAMI" | grep -qi "not authenticated"; then
+  echo "ERROR: not authenticated. Run 'wrangler login' or export CLOUDFLARE_API_TOKEN (+ CLOUDFLARE_ACCOUNT_ID)." >&2
+  exit 1
+fi
 
 step "Ensuring D1 database '$DB_NAME' exists"
 npx wrangler d1 create "$DB_NAME" 2>/dev/null || echo "    (already exists)"
