@@ -68,6 +68,7 @@ export const api = {
 
   users: {
     get: (username: string) => request<Profile>(`/users/${encodeURIComponent(username)}`),
+    search: (q: string) => request<{ users: PublicUser[] }>(`/users?q=${encodeURIComponent(q)}`),
   },
 
   looks: {

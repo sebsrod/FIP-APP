@@ -2,6 +2,29 @@
 import { error, ok } from '../lib/json';
 import { toPublicUser, type Env, type LookItemRow, type LookRow, type LookWithItems, type UserRow } from '../types';
 
+/** GET /api/users?q=<query> — search other users by username or display name. */
+export async function handleSearchUsers(req: Request, env: Env, currentUser: UserRow): Promise<Response> {
+  const url = new URL(req.url);
+  const q = (url.searchParams.get('q') ?? '').trim();
+  if (q.length === 0) return ok({ users: [] });
+
+  // Escape LIKE wildcards so the query is matched literally.
+  const escaped = q.replace(/[\\%_]/g, (c) => `\\${c}`);
+  const pattern = `%${escaped}%`;
+
+  const result = await env.DB.prepare(
+    `SELECT * FROM users
+     WHERE id != ?1
+       AND (username LIKE ?2 ESCAPE '\\' OR display_name LIKE ?2 ESCAPE '\\')
+     ORDER BY followers_count DESC, username COLLATE NOCASE ASC
+     LIMIT 20`,
+  )
+    .bind(currentUser.id, pattern)
+    .all<UserRow>();
+
+  return ok({ users: (result.results ?? []).map(toPublicUser) });
+}
+
 export async function handleGetUser(_req: Request, env: Env, username: string): Promise<Response> {
   const user = await env.DB.prepare(`SELECT * FROM users WHERE username = ? COLLATE NOCASE`)
     .bind(username)

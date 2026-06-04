@@ -9,7 +9,7 @@ import { requireAuth } from './auth/middleware';
 import { handleLogin, handleLogout, handleMe, handleRegister } from './routes/auth';
 import { handlePollQueue } from './routes/polls';
 import { handleVote } from './routes/votes';
-import { handleGetUser } from './routes/users';
+import { handleGetUser, handleSearchUsers } from './routes/users';
 import { handleCreateLook } from './routes/looks';
 import { handleUpload } from './routes/uploads';
 import { handleClick } from './routes/clicks';
@@ -46,8 +46,10 @@ async function handleApi(req: Request, env: Env, url: URL): Promise<Response> {
     return error(404, 'Not found');
   }
 
-  if (path[0] === 'users' && path[1] && method === 'GET') {
-    return handleGetUser(req, env, decodeURIComponent(path[1]));
+  if (path[0] === 'users' && method === 'GET') {
+    // /api/users?q=…  -> search;  /api/users/:username -> profile
+    if (path[1]) return handleGetUser(req, env, decodeURIComponent(path[1]));
+    return handleSearchUsers(req, env, user);
   }
 
   if (path[0] === 'looks' && method === 'POST') return handleCreateLook(req, env, user);
