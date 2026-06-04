@@ -33,12 +33,15 @@ one-tap "Try a demo account" chips for convenience.
 **Prerequisites:** Node 18+ (tested on Node 22) and npm.
 
 ```bash
-npm install          # install dependencies
-npm run setup:local  # generate icons, build the app, create + seed the LOCAL D1
-npm run dev          # start Vite (5173) + the Worker (8787) together
+npm install   # install dependencies
+npm run dev   # one command: builds, creates + seeds the LOCAL D1, then runs both servers
 ```
 
 Then open **http://localhost:5173**.
+
+`npm run dev` is self-contained — it runs `setup:local` (generate icons, build the
+app, create and seed the local D1) and then starts Vite (`:5173`) and the Worker
+(`:8787`) together. The seed is idempotent, so restarting is safe and fast.
 
 - The frontend runs under Vite with HMR on `:5173`.
 - The Worker runs under `wrangler dev` on `:8787`; Vite proxies `/api/*` to it, so

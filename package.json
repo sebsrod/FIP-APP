@@ -5,7 +5,7 @@
   "description": "FIP — Real-Time Fashion Voting PWA (React + Cloudflare Workers + D1 + R2)",
   "type": "module",
   "scripts": {
-    "dev": "npm run build:web && concurrently -k -n web,api -c blue,magenta \"npm run dev:web\" \"npm run dev:worker\"",
+    "dev": "npm run setup:local && concurrently -k -n web,api -c blue,magenta \"npm run dev:web\" \"npm run dev:worker\"",
     "dev:web": "vite",
     "dev:worker": "wrangler dev --port 8787",
     "build": "npm run build:web",
