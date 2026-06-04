@@ -1,11 +1,12 @@
 import { useEffect } from 'react';
-import { Sparkles, TriangleAlert, RefreshCw } from 'lucide-react';
+import { Search, Sparkles, TriangleAlert, RefreshCw } from 'lucide-react';
 import { usePollQueue } from './usePollQueue';
 import { VoteCanvas } from './VoteCanvas';
 import { prefetchImages } from '@/lib/prefetch';
 import { Button } from '@/components/Button';
+import { Wordmark } from '@/components/Wordmark';
 
-export function FeedScreen() {
+export function FeedScreen({ onOpenSearch }: { onOpenSearch?: () => void }) {
   const { current, next, status, error, isEmpty, advance, reload } = usePollQueue();
 
   // Prefetch the next poll's images during the current poll (no flash on swap).
@@ -13,14 +14,38 @@ export function FeedScreen() {
     if (next) prefetchImages([next.option_a_image_url, next.option_b_image_url]);
   }, [next]);
 
-  if (status === 'loading') return <FeedSkeleton />;
-  if (status === 'error') return <FeedMessage Icon={TriangleAlert} title="Couldn't load the feed" body={error ?? 'Please try again.'} onAction={reload} actionLabel="Retry" />;
-  if (isEmpty) return <FeedMessage Icon={Sparkles} title="You're all caught up" body="You've voted on every look in the queue. Check back soon for fresh pairings." onAction={reload} actionLabel="Check again" />;
-  if (!current) return <FeedSkeleton />; // brief top-up gap
-
   return (
-    <div key={current.id} className="h-full w-full motion-safe:animate-fade-in">
-      <VoteCanvas poll={current} onAdvance={advance} />
+    <div className="flex h-full flex-col">
+      {/* Slim header with brand + search */}
+      <div className="flex shrink-0 items-center justify-between border-b border-white/10 bg-zinc-900/90 px-4 py-3 backdrop-blur">
+        <Wordmark className="text-xl" />
+        {onOpenSearch ? (
+          <button
+            type="button"
+            onClick={onOpenSearch}
+            aria-label="Search creators"
+            className="rounded-full p-2 text-zinc-300 transition-colors hover:bg-white/5"
+          >
+            <Search className="h-5 w-5" aria-hidden />
+          </button>
+        ) : null}
+      </div>
+
+      <div className="relative flex-1 overflow-hidden">
+        {status === 'loading' ? (
+          <FeedSkeleton />
+        ) : status === 'error' ? (
+          <FeedMessage Icon={TriangleAlert} title="Couldn't load the feed" body={error ?? 'Please try again.'} onAction={reload} actionLabel="Retry" />
+        ) : isEmpty ? (
+          <FeedMessage Icon={Sparkles} title="You're all caught up" body="You've voted on every look in the queue. Check back soon for fresh pairings." onAction={reload} actionLabel="Check again" />
+        ) : !current ? (
+          <FeedSkeleton />
+        ) : (
+          <div key={current.id} className="h-full w-full motion-safe:animate-fade-in">
+            <VoteCanvas poll={current} onAdvance={advance} />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -1,10 +1,15 @@
-import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { X, Plus, Trash2, ImageDown } from 'lucide-react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type PointerEvent,
+} from 'react';
+import { Camera, Images, Loader2, Plus, Trash2, X } from 'lucide-react';
 import { api, ApiError } from '@/api/client';
 import type { DraftItem, Look } from '@/api/types';
 import { Button } from '@/components/Button';
 import { Input } from '@/components/Input';
-import { ImageWithFallback } from '@/components/ImageWithFallback';
 import { cn } from '@/lib/cn';
 
 interface DraftRow {
@@ -23,17 +28,17 @@ const FIELD =
 
 const clamp = (n: number) => Math.max(0, Math.min(100, n));
 
-export function PublishModal({
-  onClose,
+export function PublishScreen({
   onPublished,
+  onCancel,
 }: {
-  onClose: () => void;
   onPublished: (look: Look) => void;
+  onCancel: () => void;
 }) {
-  const [urlInput, setUrlInput] = useState('');
-  const [importing, setImporting] = useState(false);
+  const [localPreview, setLocalPreview] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [importError, setImportError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const [caption, setCaption] = useState('');
   const [rows, setRows] = useState<DraftRow[]>([]);
@@ -42,30 +47,54 @@ export function PublishModal({
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
 
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
+  const objectUrl = useRef<string | null>(null);
 
+  // Revoke the local object URL when it changes or on unmount.
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !publishing) onClose();
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, publishing]);
+    return () => {
+      if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+    };
+  }, []);
 
-  async function importImage() {
-    const url = urlInput.trim();
-    if (!url) return;
-    setImporting(true);
-    setImportError(null);
-    try {
-      const res = await api.uploads.fromUrl(url);
-      setImageUrl(res.url);
-    } catch (e) {
-      setImportError(e instanceof ApiError ? e.message : 'Could not import image');
-    } finally {
-      setImporting(false);
+  async function onFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setUploadError('Please choose an image file');
+      return;
     }
+    setUploadError(null);
+
+    if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+    const obj = URL.createObjectURL(file);
+    objectUrl.current = obj;
+    setLocalPreview(obj);
+    setImageUrl(null);
+
+    setUploading(true);
+    try {
+      const { url } = await api.uploads.fromFile(file);
+      setImageUrl(url);
+    } catch (err) {
+      setUploadError(err instanceof ApiError ? err.message : 'Upload failed — try again');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function resetImage() {
+    if (objectUrl.current) URL.revokeObjectURL(objectUrl.current);
+    objectUrl.current = null;
+    setLocalPreview(null);
+    setImageUrl(null);
+    setRows([]);
+    setActiveId(null);
+    setPublishError(null);
   }
 
   function updateRow(id: string, patch: Partial<DraftRow>) {
@@ -96,8 +125,9 @@ export function PublishModal({
   }
 
   async function publish() {
+    if (uploading) return;
     if (!imageUrl) {
-      setPublishError('Import a layout image first');
+      setPublishError('Add a photo first');
       return;
     }
     if (rows.length === 0) {
@@ -138,58 +168,56 @@ export function PublishModal({
   }
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-zinc-950" role="dialog" aria-modal="true" aria-label="Publish a new look">
-      {/* Header */}
+    <div className="flex h-full flex-col bg-zinc-950">
+      {/* Hidden file inputs (camera + gallery) */}
+      <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
+      <input ref={galleryRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
+
       <header className="flex shrink-0 items-center justify-between border-b border-white/10 px-4 py-3">
         <h2 className="font-serif text-lg italic text-zinc-50">Publish New Look</h2>
         <button
           type="button"
-          onClick={onClose}
-          aria-label="Close"
+          onClick={onCancel}
+          aria-label="Cancel"
           className="rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-white/5 hover:text-white"
         >
           <X className="h-5 w-5" aria-hidden />
         </button>
       </header>
 
-      {/* Body */}
       <div className="flex-1 overflow-y-auto px-4 py-5">
-        {/* 1. Import image */}
-        {!imageUrl ? (
-          <section className="flex flex-col gap-3">
-            <Input
-              label="Layout image URL"
-              name="image_url"
-              placeholder="https://images.example.com/look.jpg"
-              value={urlInput}
-              onChange={(e) => setUrlInput(e.target.value)}
-              hint="The image is ingested through /api/uploads (stored in R2)."
-            />
-            <div className="flex items-center gap-2">
-              <Button onClick={importImage} pending={importing} className="flex-1">
-                <ImageDown className="h-4 w-4" aria-hidden />
-                Import image
+        {!localPreview ? (
+          // 1. Choose an image — camera or gallery only.
+          <div className="flex flex-col items-center gap-5 py-10 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full border border-white/10 bg-white/5">
+              <Camera className="h-7 w-7 text-rose-400" aria-hidden />
+            </div>
+            <div>
+              <h3 className="font-serif text-xl text-zinc-50">Start with a photo</h3>
+              <p className="mt-1 text-sm text-zinc-400">Snap your look or pick one from your gallery.</p>
+            </div>
+            <div className="flex w-full max-w-xs flex-col gap-2">
+              <Button onClick={() => cameraRef.current?.click()}>
+                <Camera className="h-4 w-4" aria-hidden />
+                Take a photo
               </Button>
-              <Button
-                variant="ghost"
-                onClick={() => setUrlInput(`https://picsum.photos/seed/fip-${Date.now() % 9999}/900/1350`)}
-                type="button"
-              >
-                Use a sample
+              <Button variant="outline" onClick={() => galleryRef.current?.click()}>
+                <Images className="h-4 w-4" aria-hidden />
+                Choose from gallery
               </Button>
             </div>
-            {importError ? (
+            {uploadError ? (
               <p role="alert" className="text-sm text-rose-400">
-                {importError}
+                {uploadError}
               </p>
             ) : null}
-          </section>
+          </div>
         ) : (
           <section className="flex flex-col gap-4">
             {/* Preview with draggable pins */}
             <div
               ref={previewRef}
-              className="relative aspect-[4/5] w-full touch-none overflow-hidden rounded-lg border border-white/10"
+              className="relative aspect-[4/5] w-full touch-none overflow-hidden rounded-lg border border-white/10 bg-zinc-900"
               onPointerDown={(e) => {
                 if (!activeId) return;
                 dragging.current = true;
@@ -203,19 +231,26 @@ export function PublishModal({
                 dragging.current = false;
               }}
             >
-              <ImageWithFallback src={imageUrl} alt="Look preview" className="h-full w-full" eager />
+              <img src={localPreview} alt="Look preview" className="h-full w-full object-cover" draggable={false} />
               {rows.map((r) => (
                 <span
                   key={r.id}
                   className={cn(
-                    'pointer-events-none absolute rounded-full bg-rose-600 transition-transform',
+                    'pointer-events-none absolute rounded-full bg-rose-600',
                     r.id === activeId ? 'h-3.5 w-3.5 ring-2 ring-white/80' : 'h-2.5 w-2.5',
                   )}
                   style={{ left: `${r.x_pct}%`, top: `${r.y_pct}%`, transform: 'translate(-50%, -50%)' }}
                   aria-hidden
                 />
               ))}
-              {activeId ? (
+              {uploading ? (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40">
+                  <span className="flex items-center gap-2 rounded-full bg-black/70 px-3 py-1.5 text-xs text-zinc-100">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                    Uploading…
+                  </span>
+                </div>
+              ) : activeId ? (
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 text-center text-[11px] text-zinc-200">
                   Tap or drag on the image to place this pin
                 </div>
@@ -224,14 +259,10 @@ export function PublishModal({
 
             <button
               type="button"
-              onClick={() => {
-                setImageUrl(null);
-                setRows([]);
-                setActiveId(null);
-              }}
+              onClick={resetImage}
               className="self-start text-xs text-zinc-400 underline-offset-4 hover:text-zinc-200 hover:underline"
             >
-              Choose a different image
+              Change photo
             </button>
 
             <Input
@@ -242,7 +273,6 @@ export function PublishModal({
               onChange={(e) => setCaption(e.target.value)}
             />
 
-            {/* Items */}
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-medium uppercase tracking-wider text-zinc-400">Shoppable items</h3>
               <button
@@ -257,7 +287,7 @@ export function PublishModal({
 
             {rows.length === 0 ? (
               <p className="rounded-lg border border-dashed border-white/10 px-3 py-6 text-center text-sm text-zinc-500">
-                No items yet. Add one, then pin it on the image.
+                No items yet. Add one, then pin it on the photo.
               </p>
             ) : null}
 
@@ -293,70 +323,21 @@ export function PublishModal({
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
-                    <input
-                      className={FIELD}
-                      placeholder="Brand"
-                      aria-label="Brand"
-                      value={r.brand}
-                      onChange={(e) => updateRow(r.id, { brand: e.target.value })}
-                    />
-                    <input
-                      className={FIELD}
-                      placeholder="Item name"
-                      aria-label="Item name"
-                      value={r.item_name}
-                      onChange={(e) => updateRow(r.id, { item_name: e.target.value })}
-                    />
-                    <input
-                      className={FIELD}
-                      placeholder="Price (e.g. 49)"
-                      inputMode="decimal"
-                      aria-label="Price"
-                      value={r.priceDollars}
-                      onChange={(e) => updateRow(r.id, { priceDollars: e.target.value })}
-                    />
-                    <input
-                      className={FIELD}
-                      placeholder="Currency"
-                      aria-label="Currency"
-                      value={r.currency}
-                      maxLength={3}
-                      onChange={(e) => updateRow(r.id, { currency: e.target.value })}
-                    />
-                    <input
-                      className={cn(FIELD, 'col-span-2')}
-                      placeholder="Affiliate URL (https://…)"
-                      aria-label="Affiliate URL"
-                      value={r.affiliate_url}
-                      onChange={(e) => updateRow(r.id, { affiliate_url: e.target.value })}
-                    />
+                    <input className={FIELD} placeholder="Brand" aria-label="Brand" value={r.brand} onChange={(e) => updateRow(r.id, { brand: e.target.value })} />
+                    <input className={FIELD} placeholder="Item name" aria-label="Item name" value={r.item_name} onChange={(e) => updateRow(r.id, { item_name: e.target.value })} />
+                    <input className={FIELD} placeholder="Price (e.g. 49)" inputMode="decimal" aria-label="Price" value={r.priceDollars} onChange={(e) => updateRow(r.id, { priceDollars: e.target.value })} />
+                    <input className={FIELD} placeholder="Currency" aria-label="Currency" maxLength={3} value={r.currency} onChange={(e) => updateRow(r.id, { currency: e.target.value })} />
+                    <input className={cn(FIELD, 'col-span-2')} placeholder="Affiliate URL (https://…)" aria-label="Affiliate URL" value={r.affiliate_url} onChange={(e) => updateRow(r.id, { affiliate_url: e.target.value })} />
                   </div>
 
-                  {/* Precise pin controls */}
                   <div className="mt-3 grid grid-cols-2 gap-3">
                     <label className="flex items-center gap-2 text-[11px] text-zinc-500">
                       X
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={r.x_pct}
-                        onChange={(e) => updateRow(r.id, { x_pct: Number(e.target.value) })}
-                        className="w-full accent-rose-600"
-                        aria-label={`Item ${idx + 1} horizontal position`}
-                      />
+                      <input type="range" min={0} max={100} value={r.x_pct} onChange={(e) => updateRow(r.id, { x_pct: Number(e.target.value) })} className="w-full accent-rose-600" aria-label={`Item ${idx + 1} horizontal position`} />
                     </label>
                     <label className="flex items-center gap-2 text-[11px] text-zinc-500">
                       Y
-                      <input
-                        type="range"
-                        min={0}
-                        max={100}
-                        value={r.y_pct}
-                        onChange={(e) => updateRow(r.id, { y_pct: Number(e.target.value) })}
-                        className="w-full accent-rose-600"
-                        aria-label={`Item ${idx + 1} vertical position`}
-                      />
+                      <input type="range" min={0} max={100} value={r.y_pct} onChange={(e) => updateRow(r.id, { y_pct: Number(e.target.value) })} className="w-full accent-rose-600" aria-label={`Item ${idx + 1} vertical position`} />
                     </label>
                   </div>
                 </div>
@@ -366,16 +347,15 @@ export function PublishModal({
         )}
       </div>
 
-      {/* Footer */}
-      {imageUrl ? (
+      {localPreview ? (
         <footer className="shrink-0 border-t border-white/10 px-4 py-3">
           {publishError ? (
             <p role="alert" className="mb-2 text-sm text-rose-400">
               {publishError}
             </p>
           ) : null}
-          <Button onClick={publish} pending={publishing} className="w-full">
-            Publish look
+          <Button onClick={publish} pending={publishing} disabled={uploading || !imageUrl} className="w-full">
+            {uploading ? 'Uploading photo…' : 'Publish look'}
           </Button>
         </footer>
       ) : null}

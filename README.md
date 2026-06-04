@@ -21,7 +21,7 @@ never hardcoded):
 | Username | Password     | Notes                                  |
 | -------- | ------------ | -------------------------------------- |
 | `demo`   | `demo1234`   | Front-row voter, 3 published looks      |
-| `studio` | `studio1234` | Creator "Studio Atelier", 4 looks       |
+| `studio` | `studio1234` | Creator "Studio Atelier", 3 looks       |
 
 You can also register a brand-new account from the auth screen. The auth screen has
 one-tap "Try a demo account" chips for convenience.
@@ -49,7 +49,8 @@ app, create and seed the local D1) and then starts Vite (`:5173`) and the Worker
 - Data and sessions persist across reloads in the local D1 file under `.wrangler/`.
 
 > Already ran `setup:local` once? Just `npm run dev`. The seed is idempotent
-> (`INSERT OR IGNORE` with deterministic ids), so re-running setup is safe.
+> (deterministic ids; accounts preserved, demo looks/polls refreshed), so
+> re-running setup is safe.
 
 Prefer the production-like single-origin experience? After `npm run setup:local`,
 run `npm run dev:worker` alone and open **http://localhost:8787** — the Worker serves
@@ -71,8 +72,12 @@ the built app and the API on one origin (no HMR).
 - **Server-authoritative vote counts** with optimistic client updates; percentages
   are computed server-side and forced to sum to 100 (0/0 → 0%/0%, never `NaN`).
 - **Images:** uploads go to R2 and are streamed back through `GET /api/assets/<key>`
-  (same-origin, no public-bucket config required). Seed imagery uses deterministic
-  picsum.photos URLs so the app looks populated on first boot.
+  (same-origin, no public-bucket config required). Publishing is **upload-only**
+  (camera or gallery) — no URL paste. Seed imagery uses curated Unsplash editorial
+  fashion photos so the app looks populated on first boot.
+- **Navigation:** bottom tabs **Feed · Publish · Profile**, with Publish as a raised
+  center action opening an upload-only composer; a search overlay finds other creators
+  and opens their (read-only) profile.
 - **Vite config lives at the repo root** (with `root: ./web`) so a bare `vite` /
   `vite build` from the repo root resolves it.
 
@@ -88,10 +93,12 @@ the built app and the API on one origin (no HMR).
   /src
     /api                  typed fetch client + DTOs (client.ts, types.ts)
     /auth                 AuthContext, useAuth, AuthScreen
-    /components           DeviceFrame, Input, Button, TabBar, TagDot, ShopPopup, …
+    /components           DeviceFrame, Input, Button, TabBar, TagDot, ShopPopup, Avatar, …
     /features
       /feed               usePollQueue, useVote, VoteCanvas, SideCanvas, FeedScreen
-      /profile            useProfile, LookCard, PublishModal, ProfileScreen
+      /profile            useProfile, LookCard, ProfileScreen
+      /publish            PublishScreen (camera/gallery upload, pin items)
+      /search             useUserSearch, SearchScreen
     /lib                  format, prefetch, haptics, affiliate, cn
     /styles               Tailwind entry
     App.tsx  main.tsx
@@ -121,6 +128,7 @@ runs `requireAuth` and derives the user from the session.
 | GET    | `/api/auth/me`             | —    | bootstraps auth state; 401 if logged out                |
 | GET    | `/api/polls/queue?limit=10`| ✓    | active polls **with tags**, excluding ones you voted on |
 | POST   | `/api/polls/:id/vote`      | ✓    | `{side}`; atomic + idempotent per user; returns totals  |
+| GET    | `/api/users?q=<query>`     | ✓    | search users by username/display name → `{users:[…]}`    |
 | GET    | `/api/users/:username`     | ✓    | `{user, looks:[{…,items:[…]}]}`                          |
 | POST   | `/api/looks`               | ✓    | publish a look (owner = session user)                   |
 | POST   | `/api/uploads`             | ✓    | multipart `file` **or** `{url}` → `{url}` (R2)          |
@@ -133,12 +141,14 @@ runs `requireAuth` and derives the user from the session.
 
 `worker/src/db/seed.ts` (run with `tsx`) imports the **same** PBKDF2 module the
 Worker uses, hashes the demo passwords, and writes `worker/src/db/seed.generated.sql`
-with idempotent `INSERT OR IGNORE` statements. That SQL is then applied with
-`wrangler d1 execute`. So seeded hashes can never drift from runtime hashes, and the
-database never contains a plaintext password.
+idempotent statements (`users` use `INSERT OR IGNORE` to preserve accounts; poll/look
+content uses `INSERT OR REPLACE` so re-seeding refreshes the demo imagery). That SQL
+is applied with `wrangler d1 execute`. So seeded hashes can never drift from runtime
+hashes, and the database never contains a plaintext password.
 
-Seed content: 2 users, 8 active polls (2–4 affiliate tags each across both images),
-and 3–4 published looks per creator with 2–3 shoppable items each.
+Seed content: 2 users, 6 active polls (2–4 affiliate tags each across both images),
+and 3 published looks per creator with 2–3 shoppable items each — all using curated
+Unsplash editorial fashion photography.
 
 ---
 

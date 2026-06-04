@@ -118,8 +118,10 @@ npm run db:seed:remote
 ```
 
 This regenerates `worker/src/db/seed.generated.sql` (hashing the demo passwords
-through the real PBKDF2 path) and applies it with
-`wrangler d1 execute fip-db --remote`. It's idempotent (`INSERT OR IGNORE`).
+through the real PBKDF2 path) and applies it with `wrangler d1 execute fip-db
+--remote`. It's idempotent: user accounts are preserved (`INSERT OR IGNORE`) while
+poll/look content is refreshed (`INSERT OR REPLACE`), so re-running it updates the
+demo imagery without creating duplicates.
 
 Verify the rows (and that no plaintext passwords were stored):
 
@@ -157,9 +159,12 @@ https://fip.<your-subdomain>.workers.dev
    goes high-key monochrome → dots vanish → after ~2s the next poll loads.
 5. Tap a crimson dot → the glass shop HUD opens, clamped inside the frame → tapping
    it logs a click and opens the affiliate link.
-6. **Profile:** your header, followers, and magazine feed render; **Publish New Look**
-   imports an image (via R2), lets you pin items, and adds the look to the top.
-7. Log out → you're returned to the auth screen.
+6. **Publish (center tab):** the raised `✛` opens the redesigned publish tab — take a
+   photo or choose from the gallery (uploaded to R2), pin items, and publish.
+7. **Search:** the search icon (top of Feed/Profile) finds other creators; tap a
+   result to view their profile and looks.
+8. **Profile:** your header, followers, and magazine feed render. Log out → you're
+   returned to the auth screen.
 
 Confirm analytics rows are landing:
 
@@ -241,7 +246,7 @@ npx wrangler r2 bucket delete fip-assets              # remove the bucket (empty
 | `10000` / auth errors from Wrangler | Re-run `npx wrangler login`, or check `CLOUDFLARE_API_TOKEN` scopes (needs Workers + D1 + R2). |
 | R2 commands fail with "not enabled" | Enable R2 once in the dashboard (free), then retry `r2 bucket create`. |
 | Login works but reloading logs you out | Ensure you're on **HTTPS** (the `*.workers.dev` URL is HTTPS) so the `Secure` cookie is stored. |
-| Images don't appear | Seed imagery is external (picsum.photos / dicebear) and needs outbound connectivity from the browser; uploaded images are served from R2 via `/api/assets/...`. |
+| Images don't appear | Seed imagery is external (Unsplash CDN / dicebear avatars) and needs outbound connectivity from the browser; uploaded images are served from R2 via `/api/assets/...`. |
 | Static assets 404 after deploy | Run `npm run build:web` (or `npm run deploy`, which builds) so `web/dist` exists before upload. |
 | Want a clean DB | `npx wrangler d1 execute fip-db --remote --command "DROP TABLE IF EXISTS ..."` then re-run steps 4–5, or delete & recreate the database. |
 

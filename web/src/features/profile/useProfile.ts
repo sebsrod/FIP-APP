@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api, ApiError } from '@/api/client';
-import type { Look, Profile } from '@/api/types';
+import type { Profile } from '@/api/types';
 
 export function useProfile(username: string | null) {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -24,10 +24,5 @@ export function useProfile(username: string | null) {
     load();
   }, [load]);
 
-  /** Prepend a freshly published look without a round-trip. */
-  const addLook = useCallback((look: Look) => {
-    setProfile((prev) => (prev ? { ...prev, looks: [look, ...prev.looks] } : prev));
-  }, []);
-
-  return { profile, status, error, reload: load, addLook };
+  return { profile, status, error, reload: load };
 }
