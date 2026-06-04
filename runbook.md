@@ -7,6 +7,23 @@ Everything runs on Cloudflare's free tier for a demo. Estimated time: ~10 minute
 
 ---
 
+## Quick deploy (one script)
+
+If you just want to ship, the whole flow below is automated in
+[`scripts/deploy.sh`](./scripts/deploy.sh) — idempotent and non-interactive
+(uses an API token, auto-creates D1 + R2, writes the `database_id` into
+`wrangler.toml`, migrates, seeds, deploys, and verifies):
+
+```bash
+export CLOUDFLARE_API_TOKEN=xxxxxxxx   # Workers Scripts:Edit, D1:Edit, R2 Storage:Edit, Account Settings:Read
+export CLOUDFLARE_ACCOUNT_ID=xxxxxxxx
+bash scripts/deploy.sh
+```
+
+The rest of this document explains each step (and the interactive alternative).
+
+---
+
 ## 0. Prerequisites
 
 - A **Cloudflare account** (free): https://dash.cloudflare.com/sign-up
