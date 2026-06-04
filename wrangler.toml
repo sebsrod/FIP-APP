@@ -1,0 +1,30 @@
+name = "fip"
+main = "worker/src/index.ts"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Serve the built React app (web/dist) as static assets AND run the Worker for
+# the JSON API. `run_worker_first = true` means the Worker is invoked for every
+# request; it handles /api/* itself and delegates everything else to ASSETS.
+# `single-page-application` makes unmatched routes fall back to index.html so
+# client-side routing works.
+[assets]
+directory = "./web/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = true
+
+# Cloudflare D1 (SQLite). For LOCAL dev the database_id is not validated.
+# For a REMOTE deploy, run `wrangler d1 create fip-db` and paste the real id here.
+[[d1_databases]]
+binding = "DB"
+database_name = "fip-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+
+# Cloudflare R2 bucket for uploaded look/poll images.
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "fip-assets"
+
+[observability]
+enabled = true

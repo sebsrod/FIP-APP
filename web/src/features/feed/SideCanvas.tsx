@@ -1,0 +1,90 @@
+import { ImageWithFallback } from '@/components/ImageWithFallback';
+import { TagDot } from '@/components/TagDot';
+import { cn } from '@/lib/cn';
+import type { Side, Tag } from '@/api/types';
+
+// Exact high-key studio look for the losing image (never muddy gray).
+const LOSER_FILTER = 'grayscale brightness-110 contrast-125';
+
+interface Props {
+  side: Side;
+  imageUrl: string;
+  tags: Tag[];
+  voted: boolean;
+  isLoser: boolean;
+  pct: number | null;
+  votes: number | null;
+  showDots: boolean;
+  onVote: () => void;
+  onOpenTag: (tag: Tag) => void;
+}
+
+export function SideCanvas({
+  side,
+  imageUrl,
+  tags,
+  voted,
+  isLoser,
+  pct,
+  votes,
+  showDots,
+  onVote,
+  onOpenTag,
+}: Props) {
+  return (
+    <div className="relative h-full w-1/2 overflow-hidden">
+      {/* Image layer */}
+      <div className="absolute inset-0">
+        <ImageWithFallback
+          src={imageUrl}
+          alt={`Look ${side}`}
+          eager
+          className="h-full w-full"
+          imgClassName={isLoser ? LOSER_FILTER : undefined}
+        />
+      </div>
+
+      {/* Transparent vote target (real button, paints above the image) */}
+      <button
+        type="button"
+        aria-label={`Vote for look ${side}`}
+        onClick={onVote}
+        className="absolute inset-0 h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-rose-500/70"
+      />
+
+      {/* Affiliate dots — visible only before voting, paint above the button */}
+      {showDots
+        ? tags.map((t) => (
+            <TagDot
+              key={t.id}
+              xPct={t.x_pct}
+              yPct={t.y_pct}
+              label={`${t.brand} — ${t.item_name}`}
+              onOpen={() => onOpenTag(t)}
+            />
+          ))
+        : null}
+
+      {/* Post-vote figure, centered with a subtle scrim for legibility */}
+      {voted && pct !== null ? (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+          <div className="rounded-2xl bg-black/30 px-4 py-2 text-center backdrop-blur-[2px]">
+            <div
+              className={cn(
+                'font-sans text-5xl font-semibold tabular-nums leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]',
+                isLoser ? 'text-zinc-200' : 'text-white',
+              )}
+            >
+              {pct}%
+            </div>
+            {votes !== null ? (
+              <div className="mt-1 text-[11px] tabular-nums tracking-wide text-zinc-300">
+                {votes.toLocaleString()} votes
+              </div>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

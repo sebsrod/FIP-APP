@@ -1,0 +1,46 @@
+{
+  "name": "fip",
+  "version": "1.0.0",
+  "private": true,
+  "description": "FIP — Real-Time Fashion Voting PWA (React + Cloudflare Workers + D1 + R2)",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run build:web && concurrently -k -n web,api -c blue,magenta \"npm run dev:web\" \"npm run dev:worker\"",
+    "dev:web": "vite",
+    "dev:worker": "wrangler dev --port 8787",
+    "build": "npm run build:web",
+    "build:web": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p web/tsconfig.json --noEmit && tsc -p worker/tsconfig.json --noEmit",
+    "gen:icons": "node web/scripts/gen-icons.mjs",
+    "db:migrate:local": "wrangler d1 execute fip-db --local --file=./worker/src/db/schema.sql",
+    "db:migrate:remote": "wrangler d1 execute fip-db --remote --file=./worker/src/db/schema.sql",
+    "db:seed:gen": "tsx worker/src/db/seed.ts",
+    "db:seed:local": "npm run db:seed:gen && wrangler d1 execute fip-db --local --file=./worker/src/db/seed.generated.sql",
+    "db:seed:remote": "npm run db:seed:gen && wrangler d1 execute fip-db --remote --file=./worker/src/db/seed.generated.sql",
+    "setup:local": "npm run gen:icons && npm run build:web && npm run db:migrate:local && npm run db:seed:local",
+    "setup:remote": "npm run db:migrate:remote && npm run db:seed:remote",
+    "deploy": "npm run gen:icons && npm run build:web && wrangler deploy"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.0.18",
+    "@fontsource/playfair-display": "^5.0.20",
+    "lucide-react": "^0.408.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240725.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
+    "postcss": "^8.4.40",
+    "tailwindcss": "^3.4.7",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4",
+    "vite": "^5.3.5",
+    "wrangler": "^3.95.0"
+  }
+}

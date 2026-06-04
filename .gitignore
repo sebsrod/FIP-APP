@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+web/dist/
+dist/
+
+# Generated seed (derived from seed.ts; regenerated on demand)
+worker/src/db/seed.generated.sql
+
+# Wrangler / Cloudflare local state
+.wrangler/
+.dev.vars
+.mf/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Env
+.env
+.env.local
