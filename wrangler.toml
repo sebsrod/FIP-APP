@@ -20,6 +20,7 @@ run_worker_first = true
 binding = "DB"
 database_name = "fip-db"
 database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "worker/src/db/migrations"
 
 # Cloudflare R2 bucket for uploaded look/poll images.
 [[r2_buckets]]

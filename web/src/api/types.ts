@@ -10,6 +10,7 @@ export interface PublicUser {
   avatar_url: string | null;
   followers_count: number;
   created_at: number;
+  is_guest: boolean;
 }
 
 export interface Tag {
@@ -23,6 +24,7 @@ export interface Tag {
   price_cents: number;
   currency: string;
   affiliate_url: string;
+  verified: number;
 }
 
 export interface Poll {
@@ -34,7 +36,16 @@ export interface Poll {
   option_b_votes: number;
   status: string;
   created_at: number;
+  expires_at: number | null;
+  caption: string | null;
   tags: Tag[];
+}
+
+/** A creator's active poll as returned on their profile (stories-style). */
+export interface ActivePoll extends Poll {
+  a_pct: number;
+  b_pct: number;
+  voted_side: Side | null;
 }
 
 export interface VoteResult {
@@ -55,6 +66,7 @@ export interface LookItem {
   price_cents: number;
   currency: string;
   affiliate_url: string;
+  verified: number;
 }
 
 export interface Look {
@@ -68,12 +80,14 @@ export interface Look {
 
 export interface Profile {
   user: PublicUser;
+  is_owner: boolean;
   looks: Look[];
+  polls: ActivePoll[];
 }
 
 export type ClickSource = 'poll_tag' | 'look_item';
 
-/** Draft item used by the Publish-New-Look modal before it is sent. */
+/** Draft item used by the look (profile photo) composer before it is sent. */
 export interface DraftItem {
   x_pct: number;
   y_pct: number;
@@ -82,4 +96,16 @@ export interface DraftItem {
   price_cents: number;
   currency: string;
   affiliate_url: string;
+}
+
+/** Draft tag for the A/B poll composer (carries its side). */
+export interface DraftPollTag extends DraftItem {
+  side: Side;
+}
+
+export interface CreatePollBody {
+  caption: string;
+  option_a_image_url: string;
+  option_b_image_url: string;
+  tags: DraftPollTag[];
 }

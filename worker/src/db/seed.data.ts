@@ -21,6 +21,10 @@ function avatar(seed: string): string {
 function shop(slug: string): string {
   return `https://example.com/shop/${slug}?aff=fip`;
 }
+// A real affiliate-program host so the seeded "verified" check is demonstrable.
+function naps(slug: string): string {
+  return `https://www.net-a-porter.com/en-us/shop/${slug}?aff=fip`;
+}
 
 export interface SeedUser {
   id: string;
@@ -47,6 +51,7 @@ export interface SeedTag {
 export interface SeedPoll {
   id: string;
   creatorId: string | null;
+  caption: string;
   imageA: string;
   imageB: string;
   votesA: number;
@@ -97,19 +102,21 @@ export const USERS: SeedUser[] = [
 export const POLLS: SeedPoll[] = [
   {
     id: 'poll_1',
+    caption: 'Beach party — which fit?',
     creatorId: 'usr_studio',
     imageA: img('1483985988355-763728e1935b'), // pink editorial, shopping
     imageB: img('1496747611176-843222e1e57c'), // tan trench coat
     votesA: 142,
     votesB: 167,
     tags: [
-      { id: 'tag_1a1', side: 'A', x: 50, y: 70, brand: 'Toteme', item: 'Wool Blazer', priceCents: 49000, url: shop('toteme-wool-blazer') },
+      { id: 'tag_1a1', side: 'A', x: 50, y: 70, brand: 'Toteme', item: 'Wool Blazer', priceCents: 49000, url: naps('toteme-wool-blazer') },
       { id: 'tag_1a2', side: 'A', x: 44, y: 88, brand: 'The Row', item: 'Leather Mules', priceCents: 79000, url: shop('the-row-mules') },
       { id: 'tag_1b1', side: 'B', x: 50, y: 58, brand: 'Lemaire', item: 'Silk Slip Dress', priceCents: 38000, url: shop('lemaire-slip-dress') },
     ],
   },
   {
     id: 'poll_2',
+    caption: 'Coffee run, but make it fashion ☕',
     creatorId: null,
     imageA: img('1469334031218-e382a71b716b'), // camel coat, street style
     imageB: img('1525507119028-ed4c629a60a3'), // bold backdrop menswear
@@ -123,6 +130,7 @@ export const POLLS: SeedPoll[] = [
   },
   {
     id: 'poll_3',
+    caption: 'Date night — help me choose',
     creatorId: null,
     imageA: img('1539109136881-3be0616acf4b'), // vivid editorial portrait
     imageB: img('1515886657613-9f3515b0c78f'), // soft studio portrait
@@ -131,12 +139,13 @@ export const POLLS: SeedPoll[] = [
     tags: [
       { id: 'tag_3a1', side: 'A', x: 46, y: 40, brand: 'Jacquemus', item: 'Cropped Shirt', priceCents: 32000, url: shop('jacquemus-cropped-shirt') },
       { id: 'tag_3a2', side: 'A', x: 58, y: 78, brand: 'Bottega Veneta', item: 'Mini Jodie', priceCents: 285000, url: shop('bottega-mini-jodie') },
-      { id: 'tag_3b1', side: 'B', x: 50, y: 50, brand: 'Saint Laurent', item: 'Tailored Vest', priceCents: 99000, url: shop('saint-laurent-vest') },
+      { id: 'tag_3b1', side: 'B', x: 50, y: 50, brand: 'Saint Laurent', item: 'Tailored Vest', priceCents: 99000, url: naps('saint-laurent-vest') },
       { id: 'tag_3b2', side: 'B', x: 48, y: 86, brand: 'Manolo Blahnik', item: 'Pointed Pumps', priceCents: 84500, url: shop('manolo-pumps') },
     ],
   },
   {
     id: 'poll_4',
+    caption: 'Weekend errands or brunch?',
     creatorId: null,
     imageA: img('1502716119720-b23a93e5fe1b'), // tailored menswear
     imageB: img('1434389677669-e08b4cac3105'), // plaid / layered
@@ -150,6 +159,7 @@ export const POLLS: SeedPoll[] = [
   },
   {
     id: 'poll_5',
+    caption: 'New season, new silhouette',
     creatorId: null,
     imageA: img('1485968579580-b6d095142e6e'), // editorial, red hair
     imageB: img('1490481651871-ab68de25d43d'), // studio pose
@@ -162,6 +172,7 @@ export const POLLS: SeedPoll[] = [
   },
   {
     id: 'poll_6',
+    caption: 'Office to dinner — which one?',
     creatorId: 'usr_studio',
     imageA: img('1492707892479-7bc8d5a4ee93'), // neutral menswear portrait
     imageB: img('1529139574466-a303027c1d8b'), // street style
@@ -170,7 +181,7 @@ export const POLLS: SeedPoll[] = [
     tags: [
       { id: 'tag_6a1', side: 'A', x: 48, y: 48, brand: 'Prada', item: 'Re-Nylon Jacket', priceCents: 175000, url: shop('prada-renylon-jacket') },
       { id: 'tag_6a2', side: 'A', x: 55, y: 84, brand: 'Common Projects', item: 'Achilles Low', priceCents: 43000, url: shop('common-projects-achilles') },
-      { id: 'tag_6b1', side: 'B', x: 46, y: 60, brand: 'Max Mara', item: 'Teddy Coat', priceCents: 295000, url: shop('maxmara-teddy-coat') },
+      { id: 'tag_6b1', side: 'B', x: 46, y: 60, brand: 'Max Mara', item: 'Teddy Coat', priceCents: 295000, url: naps('maxmara-teddy-coat') },
     ],
   },
 ];
@@ -194,7 +205,7 @@ export const LOOKS: SeedLook[] = [
     items: [
       { id: 'litem_d2_1', x: 40, y: 36, brand: 'Arket', item: 'Merino Roll-Neck', priceCents: 8900, url: shop('arket-merino-rollneck') },
       { id: 'litem_d2_2', x: 60, y: 58, brand: 'Toteme', item: 'Straight Jeans', priceCents: 30000, url: shop('toteme-straight-jeans') },
-      { id: 'litem_d2_3', x: 50, y: 82, brand: 'The Row', item: 'Margaux Bag', priceCents: 390000, url: shop('the-row-margaux') },
+      { id: 'litem_d2_3', x: 50, y: 82, brand: 'The Row', item: 'Margaux Bag', priceCents: 390000, url: naps('the-row-margaux') },
     ],
   },
   {

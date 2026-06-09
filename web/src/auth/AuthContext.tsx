@@ -1,16 +1,19 @@
 import { createContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { api, ApiError } from '@/api/client';
+import { api } from '@/api/client';
 import { setUnauthorizedHandler } from '@/api/unauthorized';
 import type { PublicUser } from '@/api/types';
 
-export type AuthStatus = 'loading' | 'authed' | 'anon';
+export type AuthStatus = 'loading' | 'ready';
 
 export interface AuthContextValue {
-  user: PublicUser | null;
+  user: PublicUser | null; // the current actor — may be an anonymous guest
   status: AuthStatus;
+  isGuest: boolean; // true when not signed into a real account
+  isAuthed: boolean; // true when signed into a real account
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string, displayName?: string) => Promise<void>;
   logout: () => Promise<void>;
+  refresh: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
@@ -19,41 +22,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<PublicUser | null>(null);
   const [status, setStatus] = useState<AuthStatus>('loading');
 
-  // Bootstrap auth state from the session cookie on first load.
-  useEffect(() => {
-    let alive = true;
-    api.auth
-      .me()
-      .then((res) => {
-        if (!alive) return;
-        setUser(res.user);
-        setStatus('authed');
-      })
-      .catch((err) => {
-        if (!alive) return;
-        // 401 is the normal "not logged in" case — anything else, also treat as anon.
-        if (!(err instanceof ApiError)) console.error(err);
-        setUser(null);
-        setStatus('anon');
-      });
-    return () => {
-      alive = false;
-    };
+  const refresh = useCallback(async () => {
+    try {
+      const { user: actor } = await api.auth.me();
+      setUser(actor);
+    } catch {
+      setUser(null);
+    } finally {
+      setStatus('ready');
+    }
   }, []);
 
-  // If any protected request 401s, fall back to the auth screen.
+  // Bootstrap the actor (provisions a guest server-side if needed).
   useEffect(() => {
-    setUnauthorizedHandler(() => {
-      setUser(null);
-      setStatus('anon');
-    });
+    void refresh();
+  }, [refresh]);
+
+  // A genuine session expiry on a protected route -> re-resolve the actor.
+  useEffect(() => {
+    setUnauthorizedHandler(() => void refresh());
     return () => setUnauthorizedHandler(null);
-  }, []);
+  }, [refresh]);
 
   const login = useCallback(async (username: string, password: string) => {
     const res = await api.auth.login({ username, password });
     setUser(res.user);
-    setStatus('authed');
+    setStatus('ready');
   }, []);
 
   const register = useCallback(async (username: string, password: string, displayName?: string) => {
@@ -63,22 +57,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       display_name: displayName?.trim() ? displayName.trim() : undefined,
     });
     setUser(res.user);
-    setStatus('authed');
+    setStatus('ready');
   }, []);
 
   const logout = useCallback(async () => {
     try {
       await api.auth.logout();
     } catch {
-      /* clear local state regardless */
+      /* ignore */
     }
-    setUser(null);
-    setStatus('anon');
-  }, []);
+    // Re-provision a fresh guest so the app keeps working anonymously.
+    await refresh();
+  }, [refresh]);
 
+  const isGuest = !user || user.is_guest;
   const value = useMemo<AuthContextValue>(
-    () => ({ user, status, login, register, logout }),
-    [user, status, login, register, logout],
+    () => ({ user, status, isGuest, isAuthed: !isGuest, login, register, logout, refresh }),
+    [user, status, isGuest, login, register, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

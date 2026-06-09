@@ -1,13 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AuthProvider } from '@/auth/AuthContext';
 import { useAuth } from '@/auth/useAuth';
-import { AuthScreen } from '@/auth/AuthScreen';
+import { AuthModal } from '@/auth/AuthModal';
 import { DeviceFrame } from '@/components/DeviceFrame';
 import { TabBar, type Tab } from '@/components/TabBar';
 import { Wordmark } from '@/components/Wordmark';
 import { FeedScreen } from '@/features/feed/FeedScreen';
 import { ProfileScreen } from '@/features/profile/ProfileScreen';
-import { PublishScreen } from '@/features/publish/PublishScreen';
+import { PollComposer } from '@/features/poll-composer/PollComposer';
 import { SearchScreen } from '@/features/search/SearchScreen';
 
 function Splash() {
@@ -19,49 +19,77 @@ function Splash() {
 }
 
 function AppShell() {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const me = user?.username ?? '';
 
-  const [tab, setTab] = useState<Tab>('feed');
+  const [tab, setTab] = useState<Tab>('poll');
   const [searchOpen, setSearchOpen] = useState(false);
   const [viewingUsername, setViewingUsername] = useState<string | null>(null);
 
-  function goTab(t: Tab) {
+  // Auth gating for publish/profile when browsing as a guest.
+  const [authReason, setAuthReason] = useState<string | null>(null);
+  const [pendingTab, setPendingTab] = useState<Tab | null>(null);
+
+  // If the session drops to a guest (e.g. after logout), leave gated tabs.
+  useEffect(() => {
+    if (isGuest && tab !== 'poll') setTab('poll');
+  }, [isGuest, tab]);
+
+  function navigate(t: Tab) {
     setSearchOpen(false);
     setViewingUsername(null);
     setTab(t);
   }
 
+  function goTab(t: Tab) {
+    if ((t === 'publish' || t === 'profile') && isGuest) {
+      setPendingTab(t);
+      setAuthReason(t === 'publish' ? 'Create an account to publish a poll.' : 'Log in to see your profile.');
+      return;
+    }
+    navigate(t);
+  }
+
   return (
     <div className="flex h-full flex-col">
       <main className="relative flex-1 overflow-hidden">
-        {tab === 'feed' ? <FeedScreen onOpenSearch={() => setSearchOpen(true)} /> : null}
+        {tab === 'poll' ? <FeedScreen onOpenSearch={() => setSearchOpen(true)} /> : null}
         {tab === 'publish' ? (
-          <PublishScreen onPublished={() => setTab('profile')} onCancel={() => setTab('feed')} />
+          <PollComposer onCancel={() => setTab('poll')} onCreated={() => setTab('profile')} />
         ) : null}
-        {tab === 'profile' ? (
-          <ProfileScreen username={me} isMe onOpenSearch={() => setSearchOpen(true)} />
-        ) : null}
+        {tab === 'profile' ? <ProfileScreen username={me} isMe onOpenSearch={() => setSearchOpen(true)} /> : null}
 
-        {/* Foreign profile overlay (from search) */}
+        {/* Foreign profile (from search) */}
         {viewingUsername ? (
           <div className="absolute inset-0 z-40">
-            <ProfileScreen
-              key={viewingUsername}
-              username={viewingUsername}
-              isMe={false}
-              onBack={() => setViewingUsername(null)}
-            />
+            <ProfileScreen key={viewingUsername} username={viewingUsername} isMe={false} onBack={() => setViewingUsername(null)} />
           </div>
         ) : null}
 
-        {/* Search overlay */}
+        {/* Search */}
         {searchOpen ? (
           <SearchScreen
             onClose={() => setSearchOpen(false)}
             onSelectUser={(u) => {
               setSearchOpen(false);
               setViewingUsername(u);
+            }}
+          />
+        ) : null}
+
+        {/* Auth popup for guests */}
+        {authReason !== null ? (
+          <AuthModal
+            reason={authReason}
+            onClose={() => {
+              setAuthReason(null);
+              setPendingTab(null);
+            }}
+            onSuccess={() => {
+              const t = pendingTab;
+              setAuthReason(null);
+              setPendingTab(null);
+              if (t) navigate(t);
             }}
           />
         ) : null}
@@ -72,11 +100,9 @@ function AppShell() {
   );
 }
 
-/** Auth gate: everything past here requires a valid session. */
 function Gate() {
   const { status } = useAuth();
   if (status === 'loading') return <Splash />;
-  if (status === 'anon') return <AuthScreen />;
   return <AppShell />;
 }
 

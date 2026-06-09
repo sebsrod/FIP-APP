@@ -18,6 +18,7 @@ export interface UserRow {
   avatar_url: string | null;
   followers_count: number;
   created_at: number;
+  is_guest: number; // 1 = anonymous (can vote/click, cannot publish)
 }
 
 /** The user shape that is safe to return over the API (no secrets). */
@@ -29,6 +30,7 @@ export interface PublicUser {
   avatar_url: string | null;
   followers_count: number;
   created_at: number;
+  is_guest: boolean;
 }
 
 export function toPublicUser(row: UserRow): PublicUser {
@@ -40,6 +42,7 @@ export function toPublicUser(row: UserRow): PublicUser {
     avatar_url: row.avatar_url,
     followers_count: row.followers_count,
     created_at: row.created_at,
+    is_guest: row.is_guest === 1,
   };
 }
 
@@ -56,6 +59,7 @@ export interface TagRow {
   price_cents: number;
   currency: string;
   affiliate_url: string;
+  verified: number; // 1 = link belongs to a known affiliate program
 }
 
 export interface PollRow {
@@ -67,6 +71,8 @@ export interface PollRow {
   option_b_votes: number;
   status: string;
   created_at: number;
+  expires_at: number | null; // null = never expires (seed); else epoch ms
+  caption: string | null;
 }
 
 /** A poll enriched with its tags, as returned by /api/polls/queue. */
@@ -84,6 +90,7 @@ export interface LookItemRow {
   price_cents: number;
   currency: string;
   affiliate_url: string;
+  verified: number;
 }
 
 export interface LookRow {

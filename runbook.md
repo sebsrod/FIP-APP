@@ -104,10 +104,12 @@ same-origin.
 
 ```bash
 npm run db:migrate:remote
-# = npx wrangler d1 execute fip-db --remote --file=./worker/src/db/schema.sql
+# = npx wrangler d1 migrations apply fip-db --remote
 ```
 
-The schema is idempotent (`CREATE TABLE IF NOT EXISTS`), so it's safe to re-run.
+Schema changes ship as **D1 migrations** (`worker/src/db/migrations/`). `migrations
+apply` runs only the not-yet-applied files and tracks them, so it's safe to re-run and
+upgrades an existing database (with `ALTER`s) without losing data.
 
 ---
 
@@ -152,19 +154,21 @@ https://fip.<your-subdomain>.workers.dev
 
 ## 7. Verify
 
-1. Open the printed `*.workers.dev` URL.
-2. You should land on the **auth screen** (the app is fully gated).
-3. Log in with **`demo` / `demo1234`** (or tap the demo chip).
-4. **Feed:** tap an image to vote → centered percentages appear → the losing side
-   goes high-key monochrome → dots vanish → after ~2s the next poll loads.
-5. Tap a crimson dot → the glass shop HUD opens, clamped inside the frame → tapping
-   it logs a click and opens the affiliate link.
-6. **Publish (center tab):** the raised `✛` opens the redesigned publish tab — take a
-   photo or choose from the gallery (uploaded to R2), pin items, and publish.
-7. **Search:** the search icon (top of Feed/Profile) finds other creators; tap a
-   result to view their profile and looks.
-8. **Profile:** your header, followers, and magazine feed render. Log out → you're
-   returned to the auth screen.
+1. Open the printed `*.workers.dev` URL — you land straight on the **Poll feed as a
+   guest** (no login needed).
+2. **Vote** by tapping an image → centered percentages → losing side goes high-key
+   monochrome → after ~2s the next poll loads. Guest votes count.
+3. Tap a crimson dot → the glass shop HUD opens (with a verified check on affiliate
+   brands) → tapping it logs a click and opens the link.
+4. Tap **＋** (center) or **Profile** → an auth popup appears. Log in with
+   **`demo` / `demo1234`** (or tap the demo chip).
+5. **＋ creates a poll:** split screen, camera/gallery per side, tap to drop red item
+   tags (Brand/Product/Price/Link + verified check), then a caption popup → publish
+   (the poll expires in 60 minutes).
+6. **Profile:** a red ring around the avatar means active polls — tap it to review the
+   live split (owner) or vote (visitors). The Profile **＋** publishes a permanent photo.
+7. **Search** (top icon) finds other creators; open a profile and vote on their polls.
+8. Log out (Profile) → you return to browsing as a guest.
 
 Confirm analytics rows are landing:
 

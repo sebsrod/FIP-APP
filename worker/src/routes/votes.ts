@@ -12,6 +12,9 @@ export async function handleVote(req: Request, env: Env, user: UserRow, pollId: 
 
   const poll = await env.DB.prepare(`SELECT * FROM polls WHERE id = ?`).bind(pollId).first<PollRow>();
   if (!poll) return error(404, 'Poll not found', 'poll_not_found');
+  if (poll.expires_at !== null && poll.expires_at <= Date.now()) {
+    return error(410, 'This poll has ended', 'poll_expired');
+  }
 
   // Insert the vote; UNIQUE(poll_id, user_id) makes re-votes a no-op (changes = 0).
   const insert = await env.DB.prepare(
