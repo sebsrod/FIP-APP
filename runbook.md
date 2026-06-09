@@ -7,6 +7,22 @@ Everything runs on Cloudflare's free tier for a demo. Estimated time: ~10 minute
 
 ---
 
+## Quick deploy (one script)
+
+Already authenticated (via `wrangler login` or `CLOUDFLARE_API_TOKEN`)? The whole
+flow below is automated and idempotent in [`scripts/deploy.sh`](./scripts/deploy.sh) —
+it ensures the D1 database + R2 bucket exist, writes the resolved `database_id` into
+`wrangler.toml`, applies **D1 migrations** (non-destructive `ALTER`s on an existing DB),
+seeds, builds, deploys, and verifies:
+
+```bash
+bash scripts/deploy.sh
+```
+
+The rest of this document explains each step (and the interactive alternative).
+
+---
+
 ## 0. Prerequisites
 
 - A **Cloudflare account** (free): https://dash.cloudflare.com/sign-up
