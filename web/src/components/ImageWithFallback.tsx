@@ -25,14 +25,14 @@ export function ImageWithFallback({ src, alt, className, imgClassName, eager = f
 
   if (failed) {
     return (
-      <div className={cn('flex items-center justify-center bg-zinc-800', className)} role="img" aria-label={alt}>
-        <ImageOff className="h-6 w-6 text-zinc-600" aria-hidden />
+      <div className={cn('flex items-center justify-center bg-zinc-200', className)} role="img" aria-label={alt}>
+        <ImageOff className="h-6 w-6 text-zinc-400" aria-hidden />
       </div>
     );
   }
 
   return (
-    <div className={cn('relative overflow-hidden bg-zinc-800', className)}>
+    <div className={cn('relative overflow-hidden bg-zinc-200', className)}>
       {!loaded ? <div className="skeleton absolute inset-0" aria-hidden /> : null}
       <img
         src={src}

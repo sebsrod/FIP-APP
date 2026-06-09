@@ -5,7 +5,8 @@ import { getUserForToken } from './session';
 import type { Env, UserRow } from '../types';
 
 /**
- * Returns the authenticated UserRow, or a 401 Response. Callers do:
+ * Returns the authenticated REAL user (not a guest), or a 401 Response. Used by
+ * publish routes. Callers do:
  *   const user = await requireAuth(req, env);
  *   if (user instanceof Response) return user;
  */
@@ -13,5 +14,6 @@ export async function requireAuth(req: Request, env: Env): Promise<UserRow | Res
   const token = readCookie(req, SESSION_COOKIE);
   const user = await getUserForToken(env, token);
   if (!user) return error(401, 'Authentication required', 'unauthorized');
+  if (user.is_guest === 1) return error(401, 'Create an account to publish', 'account_required');
   return user;
 }

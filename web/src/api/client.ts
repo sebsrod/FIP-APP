@@ -1,5 +1,15 @@
 /** Typed, same-origin API client. Cookies ride along via credentials:'include'. */
-import type { Look, Poll, Profile, PublicUser, Side, VoteResult, ClickSource, DraftItem } from './types';
+import type {
+  CreatePollBody,
+  Look,
+  Poll,
+  Profile,
+  PublicUser,
+  Side,
+  VoteResult,
+  ClickSource,
+  DraftItem,
+} from './types';
 import { notifyUnauthorized } from './unauthorized';
 
 export class ApiError extends Error {
@@ -32,11 +42,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
 
   if (!res.ok) {
-    // An expired/invalid session on a protected route -> drop local auth state.
-    if (res.status === 401 && !path.startsWith('/auth/')) {
+    const body = data as { error?: string; code?: string };
+    // A genuine session expiry on a protected route -> re-resolve the actor.
+    // (account_required is expected for guests hitting publish routes; the UI
+    // handles that with the auth modal, so don't trigger a refresh for it.)
+    if (res.status === 401 && !path.startsWith('/auth/') && body.code !== 'account_required') {
       notifyUnauthorized();
     }
-    const body = data as { error?: string; code?: string };
     throw new ApiError(res.status, body.error ?? res.statusText, body.code);
   }
   return data as T;
@@ -64,6 +76,7 @@ export const api = {
     queue: (limit = 10) => request<{ polls: Poll[] }>(`/polls/queue?limit=${limit}`),
     vote: (pollId: string, side: Side) =>
       request<VoteResult>(`/polls/${encodeURIComponent(pollId)}/vote`, jsonInit('POST', { side })),
+    create: (body: CreatePollBody) => request<{ poll: Poll }>('/polls', jsonInit('POST', body)),
   },
 
   users: {

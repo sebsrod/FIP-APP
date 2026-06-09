@@ -73,7 +73,7 @@ export function VoteCanvas({ poll, onAdvance }: { poll: Poll; onAdvance: () => v
   const hasVoted = voted !== null;
 
   return (
-    <div ref={containerRef} className="relative flex h-full w-full select-none bg-black">
+    <div ref={containerRef} className="relative flex h-full w-full select-none bg-white">
       <SideCanvas
         side="A"
         imageUrl={poll.option_a_image_url}
@@ -102,8 +102,17 @@ export function VoteCanvas({ poll, onAdvance }: { poll: Poll; onAdvance: () => v
       {/* Center "or" badge — vanishes immediately on vote */}
       {!hasVoted ? (
         <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-zinc-900/80 font-serif text-xl italic text-zinc-100 shadow-lg backdrop-blur">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full border border-zinc-200 bg-white/90 font-serif text-xl italic text-zinc-900 shadow-lg backdrop-blur">
             or
+          </span>
+        </div>
+      ) : null}
+
+      {/* Poll caption (context for the vote) */}
+      {poll.caption ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center px-4">
+          <span className="max-w-[90%] truncate rounded-full bg-white/85 px-3.5 py-1.5 text-sm font-medium text-zinc-900 shadow-sm backdrop-blur">
+            {poll.caption}
           </span>
         </div>
       ) : null}
@@ -115,6 +124,7 @@ export function VoteCanvas({ poll, onAdvance }: { poll: Poll; onAdvance: () => v
           itemName={hud.tag.item_name}
           priceCents={hud.tag.price_cents}
           currency={hud.tag.currency}
+          verified={hud.tag.verified === 1}
           anchorXPct={hud.xPct}
           anchorYPct={hud.yPct}
           containerRef={containerRef}

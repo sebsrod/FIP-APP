@@ -18,7 +18,10 @@ if (!(globalThis as { crypto?: Crypto }).crypto) {
 }
 
 const { hashPassword } = await import('../auth/password');
+const { isAffiliateVerified } = await import('../lib/affiliate-brands');
 const { USERS, POLLS, LOOKS, BASE_TS } = await import('./seed.data');
+
+const v = (url: string) => (isAffiliateVerified(url) ? 1 : 0);
 
 function s(value: string | null): string {
   if (value === null) return 'NULL';
@@ -31,14 +34,23 @@ async function build(): Promise<string> {
     '-- Idempotent: users use INSERT OR IGNORE (accounts preserved); poll/look',
     '-- content uses INSERT OR REPLACE so re-seeding refreshes demo imagery.',
     '',
+    '-- Remove demo content deprecated by earlier seeds (no-op on fresh DBs).',
   ];
+  for (const pid of ['poll_7', 'poll_8']) {
+    lines.push(`DELETE FROM tags WHERE poll_id = '${pid}';`);
+    lines.push(`DELETE FROM votes WHERE poll_id = '${pid}';`);
+    lines.push(`DELETE FROM polls WHERE id = '${pid}';`);
+  }
+  lines.push(`DELETE FROM look_items WHERE look_id = 'look_studio_4';`);
+  lines.push(`DELETE FROM looks WHERE id = 'look_studio_4';`);
+  lines.push('');
 
   // Users (hash passwords through the real code path).
   for (const u of USERS) {
     const { hash, salt } = await hashPassword(u.password);
     lines.push(
-      `INSERT OR IGNORE INTO users (id, username, display_name, password_hash, password_salt, bio, avatar_url, followers_count, created_at) VALUES (` +
-        `${s(u.id)}, ${s(u.username)}, ${s(u.displayName)}, ${s(hash)}, ${s(salt)}, ${s(u.bio)}, ${s(u.avatarUrl)}, ${u.followers}, ${BASE_TS});`,
+      `INSERT OR IGNORE INTO users (id, username, display_name, password_hash, password_salt, bio, avatar_url, followers_count, created_at, is_guest) VALUES (` +
+        `${s(u.id)}, ${s(u.username)}, ${s(u.displayName)}, ${s(hash)}, ${s(salt)}, ${s(u.bio)}, ${s(u.avatarUrl)}, ${u.followers}, ${BASE_TS}, 0);`,
     );
   }
   lines.push('');
@@ -47,13 +59,13 @@ async function build(): Promise<string> {
   POLLS.forEach((p, i) => {
     const ts = BASE_TS + i * 1000;
     lines.push(
-      `INSERT OR REPLACE INTO polls (id, creator_id, option_a_image_url, option_b_image_url, option_a_votes, option_b_votes, status, created_at) VALUES (` +
-        `${s(p.id)}, ${s(p.creatorId)}, ${s(p.imageA)}, ${s(p.imageB)}, ${p.votesA}, ${p.votesB}, 'active', ${ts});`,
+      `INSERT OR REPLACE INTO polls (id, creator_id, option_a_image_url, option_b_image_url, option_a_votes, option_b_votes, status, created_at, expires_at, caption) VALUES (` +
+        `${s(p.id)}, ${s(p.creatorId)}, ${s(p.imageA)}, ${s(p.imageB)}, ${p.votesA}, ${p.votesB}, 'active', ${ts}, NULL, ${s(p.caption)});`,
     );
     for (const t of p.tags) {
       lines.push(
-        `INSERT OR REPLACE INTO tags (id, poll_id, side, x_pct, y_pct, brand, item_name, price_cents, currency, affiliate_url) VALUES (` +
-          `${s(t.id)}, ${s(p.id)}, ${s(t.side)}, ${t.x}, ${t.y}, ${s(t.brand)}, ${s(t.item)}, ${t.priceCents}, ${s(t.currency ?? 'USD')}, ${s(t.url)});`,
+        `INSERT OR REPLACE INTO tags (id, poll_id, side, x_pct, y_pct, brand, item_name, price_cents, currency, affiliate_url, verified) VALUES (` +
+          `${s(t.id)}, ${s(p.id)}, ${s(t.side)}, ${t.x}, ${t.y}, ${s(t.brand)}, ${s(t.item)}, ${t.priceCents}, ${s(t.currency ?? 'USD')}, ${s(t.url)}, ${v(t.url)});`,
       );
     }
   });
@@ -68,8 +80,8 @@ async function build(): Promise<string> {
     );
     for (const it of l.items) {
       lines.push(
-        `INSERT OR REPLACE INTO look_items (id, look_id, x_pct, y_pct, brand, item_name, price_cents, currency, affiliate_url) VALUES (` +
-          `${s(it.id)}, ${s(l.id)}, ${it.x}, ${it.y}, ${s(it.brand)}, ${s(it.item)}, ${it.priceCents}, ${s(it.currency ?? 'USD')}, ${s(it.url)});`,
+        `INSERT OR REPLACE INTO look_items (id, look_id, x_pct, y_pct, brand, item_name, price_cents, currency, affiliate_url, verified) VALUES (` +
+          `${s(it.id)}, ${s(l.id)}, ${it.x}, ${it.y}, ${s(it.brand)}, ${s(it.item)}, ${it.priceCents}, ${s(it.currency ?? 'USD')}, ${s(it.url)}, ${v(it.url)});`,
       );
     }
   });

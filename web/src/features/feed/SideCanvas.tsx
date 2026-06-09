@@ -49,7 +49,7 @@ export function SideCanvas({
         type="button"
         aria-label={`Vote for look ${side}`}
         onClick={onVote}
-        className="absolute inset-0 h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-rose-500/70"
+        className="absolute inset-0 h-full w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-zinc-900/40"
       />
 
       {/* Affiliate dots — visible only before voting, paint above the button */}
@@ -68,17 +68,17 @@ export function SideCanvas({
       {/* Post-vote figure, centered with a subtle scrim for legibility */}
       {voted && pct !== null ? (
         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <div className="rounded-2xl bg-black/30 px-4 py-2 text-center backdrop-blur-[2px]">
+          <div className="rounded-2xl bg-white/80 px-4 py-2 text-center shadow-sm backdrop-blur-[2px]">
             <div
               className={cn(
-                'font-sans text-5xl font-semibold tabular-nums leading-none drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]',
-                isLoser ? 'text-zinc-200' : 'text-white',
+                'font-sans text-5xl font-semibold tabular-nums leading-none',
+                isLoser ? 'text-zinc-400' : 'text-zinc-900',
               )}
             >
               {pct}%
             </div>
             {votes !== null ? (
-              <div className="mt-1 text-[11px] tabular-nums tracking-wide text-zinc-300">
+              <div className="mt-1 text-[11px] tabular-nums tracking-wide text-zinc-500">
                 {votes.toLocaleString()} votes
               </div>
             ) : null}

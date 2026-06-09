@@ -1,11 +1,15 @@
-import { ArrowLeft, LogOut, Search, TriangleAlert } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowLeft, LogOut, Plus, Search, TriangleAlert } from 'lucide-react';
 import { useAuth } from '@/auth/useAuth';
 import { useProfile } from './useProfile';
 import { LookCard } from './LookCard';
+import { PhotoComposer } from './PhotoComposer';
+import { PollStoriesViewer } from './PollStoriesViewer';
 import { Wordmark } from '@/components/Wordmark';
 import { Avatar } from '@/components/Avatar';
 import { Skeleton } from '@/components/Skeleton';
 import { formatCount } from '@/lib/format';
+import { cn } from '@/lib/cn';
 
 interface Props {
   username: string;
@@ -16,47 +20,39 @@ interface Props {
 
 export function ProfileScreen({ username, isMe, onBack, onOpenSearch }: Props) {
   const { logout } = useAuth();
-  const { profile, status, error } = useProfile(username);
+  const { profile, status, error, reload } = useProfile(username);
+  const [composing, setComposing] = useState(false);
+  const [storiesOpen, setStoriesOpen] = useState(false);
+
+  const hasPolls = (profile?.polls.length ?? 0) > 0;
 
   return (
-    <div className="relative h-full overflow-y-auto bg-zinc-900">
+    <div className="relative h-full overflow-y-auto bg-white">
       {/* Top bar */}
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/10 bg-zinc-900/90 px-4 py-3 backdrop-blur">
+      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
         {isMe ? (
           <>
             <Wordmark className="text-xl" />
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 text-zinc-500">
               {onOpenSearch ? (
-                <button
-                  type="button"
-                  onClick={onOpenSearch}
-                  aria-label="Search creators"
-                  className="rounded-full p-2 text-zinc-300 transition-colors hover:bg-white/5"
-                >
+                <button type="button" onClick={onOpenSearch} aria-label="Search creators" className="rounded-full p-2 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
                   <Search className="h-5 w-5" aria-hidden />
                 </button>
               ) : null}
-              <button
-                type="button"
-                onClick={logout}
-                className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-2 text-sm text-zinc-400 transition-colors hover:text-rose-400"
-              >
-                <LogOut className="h-4 w-4" aria-hidden />
-                Log out
+              <button type="button" onClick={() => setComposing(true)} aria-label="Publish a photo" className="rounded-full p-2 transition-colors hover:bg-zinc-100 hover:text-zinc-900">
+                <Plus className="h-5 w-5" aria-hidden />
+              </button>
+              <button type="button" onClick={logout} aria-label="Log out" className="rounded-full p-2 transition-colors hover:bg-zinc-100 hover:text-rose-600">
+                <LogOut className="h-5 w-5" aria-hidden />
               </button>
             </div>
           </>
         ) : (
           <>
-            <button
-              type="button"
-              onClick={onBack}
-              aria-label="Back"
-              className="-ml-1.5 inline-flex items-center gap-1 rounded-full p-1.5 text-zinc-200 transition-colors hover:bg-white/5"
-            >
+            <button type="button" onClick={onBack} aria-label="Back" className="-ml-1.5 rounded-full p-1.5 text-zinc-700 transition-colors hover:bg-zinc-100">
               <ArrowLeft className="h-5 w-5" aria-hidden />
             </button>
-            <span className="truncate text-sm font-medium text-zinc-200">@{profile?.user.username ?? username}</span>
+            <span className="truncate text-sm font-medium text-zinc-900">@{profile?.user.username ?? username}</span>
             <span className="w-8" aria-hidden />
           </>
         )}
@@ -66,43 +62,72 @@ export function ProfileScreen({ username, isMe, onBack, onOpenSearch }: Props) {
         <ProfileSkeleton />
       ) : status === 'error' ? (
         <div className="flex flex-col items-center gap-3 px-10 py-20 text-center">
-          <TriangleAlert className="h-7 w-7 text-rose-400" aria-hidden />
-          <p className="text-sm text-zinc-400">{error ?? 'Could not load this profile.'}</p>
+          <TriangleAlert className="h-7 w-7 text-zinc-400" aria-hidden />
+          <p className="text-sm text-zinc-500">{error ?? 'Could not load this profile.'}</p>
         </div>
       ) : profile ? (
         <>
-          {/* Header */}
           <header className="flex flex-col items-center gap-3 px-6 py-7 text-center">
-            <Avatar url={profile.user.avatar_url} name={profile.user.display_name} size={80} />
+            {/* Avatar with story-ring when there are active polls */}
+            <button
+              type="button"
+              onClick={() => hasPolls && setStoriesOpen(true)}
+              aria-label={hasPolls ? 'View active polls' : profile.user.display_name}
+              className={cn('rounded-full', hasPolls ? 'bg-rose-500 p-[3px]' : 'cursor-default')}
+            >
+              <div className={hasPolls ? 'rounded-full bg-white p-[2px]' : ''}>
+                <Avatar url={profile.user.avatar_url} name={profile.user.display_name} size={80} />
+              </div>
+            </button>
+            {hasPolls ? (
+              <span className="-mt-1 rounded-full bg-rose-50 px-2 py-0.5 text-[11px] font-medium text-rose-600">
+                {profile.polls.length} active poll{profile.polls.length > 1 ? 's' : ''}
+              </span>
+            ) : null}
+
             <div>
-              <h1 className="font-serif text-2xl text-zinc-50">{profile.user.display_name}</h1>
+              <h1 className="font-serif text-2xl text-zinc-900">{profile.user.display_name}</h1>
               <p className="text-sm text-zinc-500">@{profile.user.username}</p>
             </div>
             <div className="flex items-center gap-6 text-center">
               <Stat value={formatCount(profile.user.followers_count)} label="Followers" />
-              <Stat value={formatCount(profile.looks.length)} label="Looks" />
+              <Stat value={formatCount(profile.looks.length)} label="Photos" />
             </div>
-            {profile.user.bio ? (
-              <p className="max-w-xs text-sm leading-relaxed text-zinc-300">{profile.user.bio}</p>
-            ) : null}
-            {isMe ? (
-              <p className="mt-1 text-xs text-zinc-500">Tap the ✛ below to publish a new look.</p>
-            ) : null}
+            {profile.user.bio ? <p className="max-w-xs text-sm leading-relaxed text-zinc-600">{profile.user.bio}</p> : null}
           </header>
 
-          {/* Magazine feed */}
+          {/* Vertical photo feed (not a grid) */}
           <section className="flex flex-col gap-6 pb-8">
             {profile.looks.length === 0 ? (
-              <p className="px-6 py-10 text-center text-sm text-zinc-500">
-                {isMe
-                  ? 'No looks yet — publish your first to start your lookbook.'
-                  : 'This creator hasn’t published any looks yet.'}
+              <p className="px-6 py-10 text-center text-sm text-zinc-400">
+                {isMe ? 'No photos yet — tap + to publish your first.' : 'No photos yet.'}
               </p>
             ) : (
               profile.looks.map((look) => <LookCard key={look.id} look={look} />)
             )}
           </section>
         </>
+      ) : null}
+
+      {composing ? (
+        <PhotoComposer
+          onCancel={() => setComposing(false)}
+          onPublished={() => {
+            setComposing(false);
+            void reload();
+          }}
+        />
+      ) : null}
+
+      {storiesOpen && profile && hasPolls ? (
+        <PollStoriesViewer
+          polls={profile.polls}
+          displayName={profile.user.display_name}
+          username={profile.user.username}
+          avatarUrl={profile.user.avatar_url}
+          isOwner={profile.is_owner}
+          onClose={() => setStoriesOpen(false)}
+        />
       ) : null}
     </div>
   );
@@ -111,8 +136,8 @@ export function ProfileScreen({ username, isMe, onBack, onOpenSearch }: Props) {
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <div className="text-lg font-semibold tabular-nums text-zinc-50">{value}</div>
-      <div className="text-[11px] uppercase tracking-wider text-zinc-500">{label}</div>
+      <div className="text-lg font-semibold tabular-nums text-zinc-900">{value}</div>
+      <div className="text-[11px] uppercase tracking-wider text-zinc-400">{label}</div>
     </div>
   );
 }

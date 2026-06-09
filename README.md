@@ -5,8 +5,13 @@ Two looks. One tap. **Which look wins?**
 FIP shows two fashion looks side by side and asks you to vote A or B. Voting is
 fast and tactile — you tap, the split appears, the next poll loads. Every look can
 carry tiny crimson affiliate tags pinned to garments; tapping one opens a compact
-shoppable HUD. Users hold real username/password accounts and publish their own
-looks to a magazine-style profile. **The whole app is gated behind authentication.**
+shoppable HUD. **Anyone can browse, vote, and shop as a guest** (guest votes count);
+**a real account is only required to publish** a poll or a profile photo. Creators
+publish A/B polls (which expire after 60 minutes) and permanent photos to a
+magazine-style profile, and review their live poll results in a stories-style viewer.
+
+The look-and-feel is a quiet, monochrome editorial palette — white surfaces, black
+type, gray UI — with crimson reserved for affiliate tags and the active-poll ring.
 
 Built as a single Cloudflare Worker that serves a React PWA **and** a same-origin
 JSON API, backed by D1 (SQLite) and R2 (image storage).
@@ -23,8 +28,9 @@ never hardcoded):
 | `demo`   | `demo1234`   | Front-row voter, 3 published looks      |
 | `studio` | `studio1234` | Creator "Studio Atelier", 3 looks       |
 
-You can also register a brand-new account from the auth screen. The auth screen has
-one-tap "Try a demo account" chips for convenience.
+You can also browse anonymously (no login) and register from the auth popup that
+appears when you tap **+** (create poll) or **Profile**. That popup has one-tap
+"Try a demo account" chips for convenience.
 
 ---
 
@@ -68,6 +74,16 @@ the built app and the API on one origin (no HMR).
 - **Opaque session tokens**, not JWT — the raw token is an httpOnly cookie; only its
   SHA-256 hash is stored in D1, so logout is a single revocable row delete.
 - **Identity is always derived from the session**, never from a request body.
+- **Guest-first.** Visitors without an account get an auto-provisioned anonymous
+  "guest" session (a `users` row with `is_guest = 1`) so their votes/clicks count and
+  dedupe per device; publishing requires a real account, and registering **upgrades the
+  guest row in place** so their votes carry over.
+- **Polls expire after 60 minutes** (`expires_at`); the queue filters them out and a
+  lazy GC deletes expired polls. Seeded demo polls never expire.
+- **Affiliate links show a "verified" check** when the host is a known affiliate
+  program (computed server-side on save).
+- **D1 schema is versioned with Cloudflare D1 migrations** (`worker/src/db/migrations`)
+  so existing databases upgrade with `ALTER`s rather than a destructive reset.
 - **Money is integer cents** in D1; all formatting happens in the client.
 - **Server-authoritative vote counts** with optimistic client updates; percentages
   are computed server-side and forced to sum to 100 (0/0 → 0%/0%, never `NaN`).
@@ -75,9 +91,11 @@ the built app and the API on one origin (no HMR).
   (same-origin, no public-bucket config required). Publishing is **upload-only**
   (camera or gallery) — no URL paste. Seed imagery uses curated Unsplash editorial
   fashion photos so the app looks populated on first boot.
-- **Navigation:** bottom tabs **Feed · Publish · Profile**, with Publish as a raised
-  center action opening an upload-only composer; a search overlay finds other creators
-  and opens their (read-only) profile.
+- **Navigation:** bottom tabs **Poll · (＋) · Profile**. The raised center ＋ opens the
+  two-sided poll composer (camera/gallery per side, red item-tag dots + a fill-in popup
+  with the verified check, then a caption popup). The Profile ＋ publishes a permanent
+  photo. A search overlay finds other creators and opens their (read-only) profile,
+  where visitors can vote on the creator's active polls (stories-style).
 - **Vite config lives at the repo root** (with `root: ./web`) so a bare `vite` /
   `vite build` from the repo root resolves it.
 
@@ -92,23 +110,23 @@ the built app and the API on one origin (no HMR).
   /scripts/gen-icons.mjs  dependency-free PNG icon generator
   /src
     /api                  typed fetch client + DTOs (client.ts, types.ts)
-    /auth                 AuthContext, useAuth, AuthScreen
+    /auth                 AuthContext, useAuth, AuthModal (login/signup popup)
     /components           DeviceFrame, Input, Button, TabBar, TagDot, ShopPopup, Avatar, …
     /features
       /feed               usePollQueue, useVote, VoteCanvas, SideCanvas, FeedScreen
-      /profile            useProfile, LookCard, ProfileScreen
-      /publish            PublishScreen (camera/gallery upload, pin items)
+      /poll-composer      PollComposer (two-sided camera/gallery + tag popup)
+      /profile            useProfile, LookCard, ProfileScreen, PhotoComposer, PollStoriesViewer
       /search             useUserSearch, SearchScreen
     /lib                  format, prefetch, haptics, affiliate, cn
     /styles               Tailwind entry
     App.tsx  main.tsx
 /worker                   Cloudflare Worker (TS)
   /src
-    index.ts              router: static assets + /api
-    /auth                 password (PBKDF2), session, cookies, requireAuth
+    index.ts              router: static assets + /api (public / guest / real-account tiers)
+    /auth                 password (PBKDF2), session, cookies, guest, requireAuth
     /routes               auth, polls, votes, users, looks, uploads, clicks, assets
-    /db                   schema.sql, ids, seed.data.ts, seed.ts (PBKDF2 hashing)
-    /lib                  json, validate, encoding, percent
+    /db                   migrations/, ids, seed.data.ts, seed.ts (PBKDF2 hashing)
+    /lib                  json, validate, encoding, percent, affiliate-brands
 wrangler.toml
 runbook.md                step-by-step Cloudflare deploy (D1 + R2 + Worker)
 ```
@@ -117,38 +135,41 @@ runbook.md                step-by-step Cloudflare deploy (D1 + R2 + Worker)
 
 ## API contract
 
-All JSON, same-origin. Auth routes set/clear the cookie; every other write route
-runs `requireAuth` and derives the user from the session.
+All JSON, same-origin. Tiers: **—** public · **G** guest-allowed (an anonymous guest
+session is auto-provisioned) · **🔒** real account required. Identity is always derived
+from the session, never the request body.
 
-| Method | Path                       | Auth | Notes                                                   |
+| Method | Path                       | Tier | Notes                                                   |
 | ------ | -------------------------- | ---- | ------------------------------------------------------- |
-| POST   | `/api/auth/register`       | —    | `{username,password,display_name?}` → 201, sets cookie  |
+| POST   | `/api/auth/register`       | —    | `{username,password,display_name?}` → 201; upgrades a guest in place |
 | POST   | `/api/auth/login`          | —    | `{username,password}` → 200; generic 401 on failure     |
 | POST   | `/api/auth/logout`         | —    | revokes session + clears cookie                         |
-| GET    | `/api/auth/me`             | —    | bootstraps auth state; 401 if logged out                |
-| GET    | `/api/polls/queue?limit=10`| ✓    | active polls **with tags**, excluding ones you voted on |
-| POST   | `/api/polls/:id/vote`      | ✓    | `{side}`; atomic + idempotent per user; returns totals  |
-| GET    | `/api/users?q=<query>`     | ✓    | search users by username/display name → `{users:[…]}`    |
-| GET    | `/api/users/:username`     | ✓    | `{user, looks:[{…,items:[…]}]}`                          |
-| POST   | `/api/looks`               | ✓    | publish a look (owner = session user)                   |
-| POST   | `/api/uploads`             | ✓    | multipart `file` **or** `{url}` → `{url}` (R2)          |
-| POST   | `/api/clicks`              | ✓    | `{source_type, source_id}` logs an affiliate click      |
+| GET    | `/api/auth/me`             | —    | returns the current actor (guest or real); provisions a guest |
+| GET    | `/api/polls/queue?limit=10`| G    | active, non-expired polls **with tags**, excluding ones you voted |
+| POST   | `/api/polls/:id/vote`      | G    | `{side}`; atomic + idempotent per actor; 410 if expired |
+| POST   | `/api/polls`               | 🔒   | create an A/B poll (+ tags, caption); expires in 60 min |
+| GET    | `/api/users?q=<query>`     | G    | search real users → `{users:[…]}`                        |
+| GET    | `/api/users/:username`     | G    | `{user, is_owner, looks:[…], polls:[…active…]}`          |
+| POST   | `/api/looks`               | 🔒   | publish a profile photo (owner = session user)          |
+| POST   | `/api/uploads`             | 🔒   | multipart `file` **or** `{url}` → `{url}` (R2)          |
+| POST   | `/api/clicks`              | G    | `{source_type, source_id}` logs an affiliate click      |
 | GET    | `/api/assets/<key>`        | —    | streams an uploaded image from R2                       |
 
 ---
 
 ## How the seed works
 
-`worker/src/db/seed.ts` (run with `tsx`) imports the **same** PBKDF2 module the
-Worker uses, hashes the demo passwords, and writes `worker/src/db/seed.generated.sql`
-idempotent statements (`users` use `INSERT OR IGNORE` to preserve accounts; poll/look
-content uses `INSERT OR REPLACE` so re-seeding refreshes the demo imagery). That SQL
-is applied with `wrangler d1 execute`. So seeded hashes can never drift from runtime
-hashes, and the database never contains a plaintext password.
+The schema is created/upgraded with **D1 migrations** (`worker/src/db/migrations/`,
+applied via `wrangler d1 migrations apply`). `worker/src/db/seed.ts` (run with `tsx`)
+then imports the **same** PBKDF2 module the Worker uses, hashes the demo passwords, and
+writes `worker/src/db/seed.generated.sql` (`users` use `INSERT OR IGNORE` to preserve
+accounts; poll/look content uses `INSERT OR REPLACE` to refresh demo imagery). So
+seeded hashes can never drift from runtime hashes, and the DB never stores a plaintext
+password.
 
-Seed content: 2 users, 6 active polls (2–4 affiliate tags each across both images),
-and 3 published looks per creator with 2–3 shoppable items each — all using curated
-Unsplash editorial fashion photography.
+Seed content: 2 creators, 6 polls (with captions + 2–4 affiliate tags; a few links use
+a real affiliate host to show the verified check; seeded polls never expire), and 3
+profile photos per creator with shoppable items — all curated Unsplash fashion imagery.
 
 ---
 
@@ -161,7 +182,7 @@ Unsplash editorial fashion photography.
 | `typecheck`            | typecheck the web app and the Worker                          |
 | `gen:icons`            | regenerate the PWA icons                                      |
 | `setup:local`          | icons + build + create & seed the **local** D1                |
-| `db:migrate:local`     | apply `schema.sql` to the local D1                            |
+| `db:migrate:local`     | apply D1 migrations to the local D1                           |
 | `db:seed:local`        | regenerate seed SQL and apply it to the local D1             |
 | `setup:remote`         | apply schema + seed to the **remote** D1                      |
 | `deploy`               | build, then `wrangler deploy`                                 |

@@ -1,6 +1,7 @@
 /** POST /api/looks — publish a look (owner = session user) with shoppable items. */
 import { error, json, readJson } from '../lib/json';
 import { clampPct, sanitizeUrl, toCents } from '../lib/validate';
+import { isAffiliateVerified } from '../lib/affiliate-brands';
 import { newId } from '../db/ids';
 import type { Env, LookItemRow, LookWithItems, UserRow } from '../types';
 
@@ -57,6 +58,7 @@ export async function handleCreateLook(req: Request, env: Env, user: UserRow): P
       price_cents: toCents(raw.price_cents),
       currency: str(raw.currency, 3)?.toUpperCase() ?? 'USD',
       affiliate_url: affiliateUrl,
+      verified: isAffiliateVerified(affiliateUrl) ? 1 : 0,
     });
   }
 
@@ -66,8 +68,8 @@ export async function handleCreateLook(req: Request, env: Env, user: UserRow): P
     ).bind(lookId, user.id, imageUrl, caption, now),
     ...items.map((it) =>
       env.DB.prepare(
-        `INSERT INTO look_items (id, look_id, x_pct, y_pct, brand, item_name, price_cents, currency, affiliate_url)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO look_items (id, look_id, x_pct, y_pct, brand, item_name, price_cents, currency, affiliate_url, verified)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         it.id,
         it.look_id,
@@ -78,6 +80,7 @@ export async function handleCreateLook(req: Request, env: Env, user: UserRow): P
         it.price_cents,
         it.currency,
         it.affiliate_url,
+        it.verified,
       ),
     ),
   ];

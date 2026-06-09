@@ -9,11 +9,9 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const VARIANTS: Record<NonNullable<ButtonProps['variant']>, string> = {
-  primary:
-    'bg-rose-600 text-white hover:bg-rose-500 active:bg-rose-700 disabled:hover:bg-rose-600',
-  outline:
-    'border border-white/15 bg-transparent text-zinc-100 hover:bg-white/5',
-  ghost: 'bg-transparent text-zinc-300 hover:text-white hover:bg-white/5',
+  primary: 'bg-zinc-900 text-white hover:bg-zinc-800 active:bg-black disabled:hover:bg-zinc-900',
+  outline: 'border border-zinc-300 bg-transparent text-zinc-900 hover:bg-zinc-100',
+  ghost: 'bg-transparent text-zinc-500 hover:text-zinc-900 hover:bg-zinc-100',
 };
 
 export function Button({
@@ -29,7 +27,7 @@ export function Button({
       className={cn(
         'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-3 text-sm font-medium',
         'transition-colors duration-200 disabled:cursor-not-allowed disabled:opacity-60',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-900',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-900/40 focus-visible:ring-offset-2 focus-visible:ring-offset-white',
         VARIANTS[variant],
         className,
       )}
